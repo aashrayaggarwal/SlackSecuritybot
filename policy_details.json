@@ -1,0 +1,7 @@
+{
+  "offensive_words": {"to_Delete": true, "to_Warn": false, "database_path": "known_databases/offensive_words.txt", "detector_func": "detect_offensive_words"},
+  "phishing_links": {"to_Delete": true, "to_Warn": false, "database_path": "known_databases/phishing_links.txt", "detector_func": "detect_phishing_links"},
+  "malicious_links": {"to_Delete": true, "to_Warn": false, "database_path": "known_databases/malicious_links.txt", "detector_func": "detect_malicious_links"},
+  "atleast_one_http_link": {"to_Delete": false, "to_Warn": true, "database_path": "", "detector_func": "detect_atleast_one_http_link"},
+  "invalid_ssl_cert": {"to_Delete": false, "to_Warn": true, "database_path": "", "detector_func": "detect_atleast_one_invalid_ssl_link"}
+}
