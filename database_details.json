@@ -1,0 +1,24 @@
+{
+  "host": "localhost",
+  "database": "events_db",
+  "port": 5432,
+  "table_name": "message_events",
+  "table_fields": {
+    "id": "BIGSERIAL",
+    "message_type": "TEXT",
+    "message_subtype": "TEXT",
+    "channel_id": "TEXT",
+    "channel_name": "TEXT",
+    "team_id": "TEXT",
+    "user_id": "TEXT",
+    "user_name": "TEXT",
+    "event_id": "TEXT",
+    "timestamp_epoch": "TIMESTAMP WITH TIME zone",
+    "text": "TEXT",
+    "atleast_one_http_link": "BOOLEAN",
+    "invalid_ssl_cert": "BOOLEAN",
+    "malicious_link": "BOOLEAN",
+    "phishing_link": "BOOLEAN",
+    "offensive_word": "BOOLEAN"
+  }
+}
