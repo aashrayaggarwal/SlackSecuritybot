@@ -5,10 +5,11 @@ import detectors
 from SlackbotWeb import SlackBotWeb
 import certifi
 from flask import Flask
-from datetime import datetime
+import datetime
 import read_files
 import queue
 import threading
+import database_operator
 
 
 def get_flask_app(flask_name = __name__):
@@ -65,6 +66,15 @@ def get_message_details(payload):
     print(event)
     print('#' * 50)
 
+    parsed_dict['team_id'] = payload.get('team_id') if payload.get('team_id') is not None else ''
+    parsed_dict['event_id'] = payload.get('event_id') if payload.get('event_id') is not None else ''
+    parsed_dict['message_type'] = event.get('type') if event.get('type') is not None else ''
+    parsed_dict['message_subtype'] = event.get('subtype') if event.get('subtype') is not None else ''
+    parsed_dict['channel_id'] = event.get('channel') if event.get('channel') is not None else ''
+    parsed_dict['channel_name'] = slack_web_adapter.get_channel_name(parsed_dict.get('channel_id')) if parsed_dict.get('channel_id') is not None else ''
+    parsed_dict['timestamp_epoch'] = event.get('ts') if event.get('ts') is not None else ''
+    parsed_dict['timestamp_string'] = datetime.datetime.fromtimestamp(float(parsed_dict.get('timestamp_epoch'))).strftime('%c') if parsed_dict.get('timestamp_epoch') is not None else ''
+
     # If the field 'blocks' is present
     if event.get('blocks') is not None:
         msg_parse_list = event.get('blocks')[0].get('elements')[0].get('elements')
@@ -93,7 +103,7 @@ def get_message_details(payload):
                         subtype_msg_text += subtype_msg_parse_dict.get('text')
                     elif subtype_msg_parse_dict.get('type') == 'link':
                         if subtype_msg_parse_dict.get('text') is not None:
-                            subtype_msg_text+= subtype_msg_parse_dict.get('text')
+                            subtype_msg_text += subtype_msg_parse_dict.get('text')
                         elif subtype_msg_parse_dict.get('url') is not None:
                             subtype_msg_text += subtype_msg_parse_dict.get('url')
 
@@ -103,17 +113,20 @@ def get_message_details(payload):
 
             parsed_dict['user_id'] = subtype_msg_structure.get('user') # Check for which user id to use
 
-    if (event.get('text') is not None) and (parsed_dict.get('text') is None):
-        parsed_dict['text'] = event.get('text')
-    if (event.get('user') is not None) and (parsed_dict.get('user_id') is None):
-        parsed_dict['user_id'] = event.get('user')
-        parsed_dict['user_name'] = slack_web_adapter.get_user_name(parsed_dict['user_id'])
-    if (event.get('channel') is not None) and (parsed_dict.get('channel_id') is None):
-        parsed_dict['channel_id'] = event.get('channel')
-        parsed_dict['channel_name'] = slack_web_adapter.get_channel_name(parsed_dict['channel_id'])
-    if (event.get('ts') is not None) and (parsed_dict.get('timestamp_epoch') is None):
-        parsed_dict['timestamp_epoch'] = event.get('ts')
-        parsed_dict['timestamp_string'] = datetime.fromtimestamp(int(float(parsed_dict['timestamp_epoch']))).strftime('%c')
+    if parsed_dict.get('text') is None:
+        if event.get('text') is not None:
+            parsed_dict['text'] = event.get('text')
+        else:
+            parsed_dict['text'] = ''
+
+    if parsed_dict.get('user_id') is None:
+        if event.get('user') is not None:
+            parsed_dict['user_id'] = event.get('user')
+        else:
+            parsed_dict['user_id'] = ''
+    print('user id is',parsed_dict['user_id'],'done')
+
+    parsed_dict['user_name'] = slack_web_adapter.get_user_name(parsed_dict.get('user_id')) if len(parsed_dict.get('user_id')) > 0 else ''
 
     print("{}--------PARSED_DICT-------------{}".format('!' * 20, '!' * 20))
     print(parsed_dict)
@@ -154,13 +167,23 @@ def warn_user_message(warn_msg, user_name, channel_id):
 def process_message_in_thread():
     """Process the elements in queue """
     while True:
+
         input_payload = payload_queue.get()
-        # If the message has to be skipped, move onto next element of queue
-        if skip_process_message(input_payload):
-            payload_queue.task_done()
-            continue
         parsed_dict = get_message_details(input_payload)
+        # If the message has to be skipped for analysis
+        if skip_process_message(input_payload):
+            # Get the default dictionary for all policy items
+            result_dict = detectors.call_detectors('', policy_dict, suspicious_dict)
+            # Insert the event into database
+            database_operator.insert_into_table(database_con, database_cursor, parsed_dict, result_dict, database_ordered_dict)
+            payload_queue.task_done()
+            # Move to the next element of the queue
+            continue
+
         result_dict = detectors.call_detectors(parsed_dict['text'], policy_dict, suspicious_dict)
+
+        # Insert the event into database
+        database_operator.insert_into_table(database_con, database_cursor, parsed_dict, result_dict, database_ordered_dict)
         print(result_dict)
         alert_msg = ''
         delete_msg = ''
@@ -207,11 +230,16 @@ config_dict = read_files.read_json_data('config_details.json')
 policy_dict, suspicious_dict = read_files.get_suspicious_items_dict('policy_details.json')
 slack_events_adapter, slack_web_adapter = get_slack_adapters(config_dict, flask_app)
 process_message = slack_events_adapter.on(event='message', f=process_message)
+
+# Read the database config file
+database_ordered_dict = read_files.read_json_data('database_details.json', order=True)
+database_con, database_cursor = database_operator.get_database_connector_cursor(database_ordered_dict, initialize_table=False)
+
 payload_queue = queue.Queue()
 thread_worker = threading.Thread(target=process_message_in_thread, daemon=True)
 thread_worker.start()
 
 if __name__ == '__main__':
-    flask_app.run(host='0.0.0.0', port=8001)
+    flask_app.run(host='0.0.0.0', port=8000)
 
 
