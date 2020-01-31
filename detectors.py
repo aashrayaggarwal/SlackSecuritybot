@@ -7,6 +7,11 @@ def call_detectors(message, policy_dict, suspicious_dict):
     detector_dict = {}
     for policy_name, policy_values in policy_dict.items():
         detector_dict[policy_name] = {'is_True':False, 'to_Delete':False, 'to_Warn':False}
+
+        # If length of message is zero, create a default dictionary for all policy items
+        if (len(message) == 0) or message is None:
+            continue
+
         # Get the detector function that should be called
         imported_detector_func = getattr(detector_modules, policy_values.get('detector_func'))
 
