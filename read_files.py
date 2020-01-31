@@ -1,10 +1,14 @@
 import json
+import collections
 
 
-def read_json_data(input_file):
+def read_json_data(input_file, order=False):
     """Return the json dict containing config details"""
     with open(input_file, 'r') as file_handle:
-        json_dict = json.load(file_handle)
+        if order is True:
+            json_dict = json.load(file_handle, object_pairs_hook=collections.OrderedDict)
+        else:
+            json_dict = json.load(file_handle)
     return json_dict
 
 
