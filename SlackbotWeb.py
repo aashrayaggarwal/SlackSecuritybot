@@ -1,19 +1,19 @@
-import os
+import logging
 import slack
 
+
 class SlackBotWeb():
-    def __init__(self, slack_bot_token, admin_private_channel_name = '', join_pubic_channels=False, public_channels_names=[]):
+    def __init__(self, slack_bot_token, admin_private_channel_name='', join_pubic_channels=False, public_channels_names=[]):
         """ Instantiate the slackbot """
         try:
             self.slack_client = slack.WebClient(token=slack_bot_token)
             response = self.slack_client.auth_test()
         except slack.errors.SlackApiError as e:
-            print("Invalid Authentication token for bot")
+            logging.error("Invalid Authentication token for bot")
         else:
-            print('helll')
-            print(response)
+            logging.debug(response)
             response_data = response.data
-            print(response_data)
+            logging.debug(response_data)
             self.bot_team_name = response_data.get('team')
             self.bot_user_name = response_data.get('user')
             self.bot_team_id = response_data.get('team_id')
@@ -34,7 +34,7 @@ class SlackBotWeb():
         try:
             response = self.slack_client.chat_postMessage(channel=channel_to_send, text=msg_to_send)
         except slack.errors.SlackApiError as e:
-            print (e)
+            logging.error(e)
             return False
         else:
             return True
@@ -56,15 +56,15 @@ class SlackBotWeb():
             if join_all_public_channels or (channel_name in public_channels_names_to_join):
                 if not (public_channel_dict.get('is_member')):
                     self.slack_client.conversations_join(channel=channel_id)
-                    print("Bot user joined {} channel".format(channel_name))
+                    logging.info("Bot user joined {} channel".format(channel_name))
                 else:
-                    print("Bot user is already a member of {} channel".format(channel_name))
+                    logging.info("Bot user is already a member of {} channel".format(channel_name))
 
                 # Remove these channels from public_channels_names_to_join list
                 public_channels_names_to_join = [i for i in public_channels_names_to_join if i != channel_name]
 
         for channel_not_visible in public_channels_names_to_join:
-            print("Bot cannot see channel {}".format(channel_not_visible))
+            logging.info("Bot cannot see channel {}".format(channel_not_visible))
 
         return True
 
@@ -83,14 +83,14 @@ class SlackBotWeb():
             if leave_all_public_channels or (channel_name in public_channels_names_to_remove):
                 if public_channel_dict.get('is_member'):
                     self.slack_client.conversations_leave(channel=channel_id)
-                    print ("Bot user left {} channel".format(channel_name))
+                    logging.info("Bot user left {} channel".format(channel_name))
                 else:
-                    print("Bot user is not member of {} channel. Skipping this channel".format(channel_name))
+                    logging.info("Bot user is not member of {} channel. Skipping this channel".format(channel_name))
 
             # Remove these channels from public_channels_names_to_join list
             public_channels_names_to_remove = [i for i in public_channels_names_to_remove if i != channel_name]
         for channel_not_visible in public_channels_names_to_remove:
-            print("Bot cannot see channel {}".format(channel_not_visible))
+            logging.info("Bot cannot see channel {}".format(channel_not_visible))
 
         return True
 
@@ -105,18 +105,18 @@ class SlackBotWeb():
         for private_channel_dict in private_channels_list:
             if private_channel_dict.get('name') == admin_private_channel_name:
                 return private_channel_dict.get('id')
-        print ("Private channel {} does not exist".format(admin_private_channel_name))
+        logging.info("Private channel {} does not exist".format(admin_private_channel_name))
         return None
 
     def get_user_details(self, user_id):
         """Return a dictionary containing user details of user associated with given user_id"""
         if user_id is None:
-            print("User ID is none")
+            logging.info("User ID is none")
             return
         try:
             response = self.slack_client.users_info(user=user_id)
         except slack.errors.SlackApiError as e:
-            print (e)
+            logging.error(e)
             return False
         else:
             return response.data.get('user')
@@ -126,7 +126,7 @@ class SlackBotWeb():
         try:
             response = self.slack_client.conversations_info(channel=channel_id)
         except slack.errors.SlackApiError as e:
-            print (e)
+            logging.error(e)
             return False
         else:
             return response.data.get('channel')
@@ -134,22 +134,30 @@ class SlackBotWeb():
     def get_user_name(self, user_id):
         """Return the username of a user given his user id """
         if user_id is None:
-            print("User ID is none")
+            logging.info("User ID is none")
             return
         user_details = self.get_user_details(user_id)
-        return user_details.get('real_name')
+        if user_details:
+            return user_details.get('real_name')
+        else:
+            return False
 
     def get_channel_name(self, channel_id):
         """Return the channel name of a channel given its channel id """
+        if channel_id is None:
+            logging.info('Channel ID is none')
         channel_details = self.get_channel_details(channel_id)
-        return channel_details.get('name')
+        if channel_details:
+            return channel_details.get('name')
+        else:
+            return False
 
     def delete_message(self, channel_id, timestamp_message):
         """Delete message sent at a particular time from the specified channel"""
         try:
             response = self.slack_client.chat_delete(channel=channel_id, ts=timestamp_message)
         except slack.errors.SlackApiError as e:
-            print (e)
+            logging.error(e)
             return False
         else:
             return True
