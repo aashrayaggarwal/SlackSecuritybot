@@ -1,5 +1,6 @@
 import psycopg2
 import datetime
+import logging
 
 
 def connect_to_database(database_ordered_dict):
@@ -8,17 +9,24 @@ def connect_to_database(database_ordered_dict):
         database_con = psycopg2.connect(host=database_ordered_dict.get('host'), port=database_ordered_dict.get('port'), database=database_ordered_dict.get('database'))
         database_cursor = database_con.cursor()
     except Exception as e:
-        print(e)
+        logging.error(e)
         return False
     else:
+        logging.info("Initialized database connector and cursor")
         return database_con, database_cursor
 
 
-def close_datacobase_connector_cursor(database_con, database_cursor):
+def close_database_connector_cursor(database_con, database_cursor):
     """Close database connector and cursor"""
-    database_cursor.close()
-    database_con.close()
-    return True
+    try:
+        database_cursor.close()
+        database_con.close()
+    except Exception as e:
+        logging.error(e)
+        return False
+    else:
+        logging.info("Closed database connector and cursor")
+        return True
 
 
 def create_initial_table(database_con, database_cursor, table_name, table_fields):
@@ -35,7 +43,7 @@ def create_initial_table(database_con, database_cursor, table_name, table_fields
         res = database_cursor.execute(sql_query)
         database_con.commit()
     except Exception as e:
-        print(e)
+        logging.error(e)
         return False
     else:
         return True
@@ -70,7 +78,6 @@ def create_insertion_dict(message_dict, flags_dict):
         'phishing_link': flags_dict.get('phishing_links').get('is_True'),
         'offensive_word': flags_dict.get('offensive_words').get('is_True')
     }
-
     return database_insert_dict
 
 
@@ -86,7 +93,7 @@ def insert_from_dict_into_table(database_con, database_cursor, database_insert_d
         values_list.append(value)
 
     if values_string[-1] == ',':
-        values_string = values_string[:-1] + ')'
+        values_stdring = values_string[:-1] + ')'
 
     if sql_query[-1] == ',':
         sql_query = sql_query[:-1] + ')'
@@ -97,9 +104,10 @@ def insert_from_dict_into_table(database_con, database_cursor, database_insert_d
         res = database_cursor.execute(sql_query, (*values_list,))
         database_con.commit()
     except Exception as e:
-        print(e)
+        logging.error(e)
         return False
     else:
+        logging.info("Inserted data in {} table".format(table_to_insert))
         return True
 
 
