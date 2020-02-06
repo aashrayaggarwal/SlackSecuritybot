@@ -1,15 +1,14 @@
-import os
 import logging
 from slackeventsapi import SlackEventAdapter
 import detectors
 from SlackbotWeb import SlackBotWeb
-import certifi
 from flask import Flask
 import datetime
 import read_files
 import queue
 import threading
 import database_operator
+import signal
 
 
 def get_flask_app(flask_name = __name__):
@@ -59,12 +58,8 @@ def get_message_details(payload):
     # https://api.slack.com/changelog/2019-09-what-they-see-is-what-you-get-and-more-and-less
     parsed_dict = {}
     event = payload.get("event", {})
-    print("{}--------PAYLOAD-------------{}".format('*'*20,'*'*20))
-    print(payload)
-    print('*'*50)
-    print("{}--------EVENT-------------{}".format('#' * 20, '#' * 20))
-    print(event)
-    print('#' * 50)
+    logging.debug("{}--------PAYLOAD-------------{}\n{}".format('*'*20, '*'*20, payload))
+    logging.debug("{}--------EVENT-------------{}\n{}".format('#' * 20, '#' * 20, event))
 
     parsed_dict['team_id'] = payload.get('team_id') if payload.get('team_id') is not None else ''
     parsed_dict['event_id'] = payload.get('event_id') if payload.get('event_id') is not None else ''
@@ -124,14 +119,10 @@ def get_message_details(payload):
             parsed_dict['user_id'] = event.get('user')
         else:
             parsed_dict['user_id'] = ''
-    print('user id is',parsed_dict['user_id'],'done')
 
     parsed_dict['user_name'] = slack_web_adapter.get_user_name(parsed_dict.get('user_id')) if len(parsed_dict.get('user_id')) > 0 else ''
 
-    print("{}--------PARSED_DICT-------------{}".format('!' * 20, '!' * 20))
-    print(parsed_dict)
-    print('!' * 50)
-
+    logging.debug("{}--------PARSED_DICT-------------{}\n{}".format('!' * 20, '!' * 20, parsed_dict))
     return parsed_dict
 
 
@@ -144,7 +135,7 @@ def send_alert_message(alert_msg, user_name, channel_name, time_event_utc, text)
     intro_alert_message += "Categories: {}\n".format(alert_msg)
     intro_alert_message += "Message Content:\n{}".format(text)
     rem = slack_web_adapter.alert_admin(message_to_send=intro_alert_message, admin_channel=slack_web_adapter.bot_admin_channel_id)
-    print('Message sent to Admin:\n{}'.format(intro_alert_message))
+    logging.info('Message sent to Admin:\n{}'.format(intro_alert_message))
 
 
 def delete_user_message(delete_msg, user_name, channel_id, time_event_epoch):
@@ -153,7 +144,6 @@ def delete_user_message(delete_msg, user_name, channel_id, time_event_epoch):
     intro_delete_msg = intro_delete_msg + delete_msg
     response_del = slack_web_adapter.delete_message(channel_id, time_event_epoch)
     response_user_del_msg = slack_web_adapter.send_msg(msg_to_send=intro_delete_msg, channel_to_send=channel_id)
-    print('Deleted message')
 
 
 def warn_user_message(warn_msg, user_name, channel_id):
@@ -161,7 +151,6 @@ def warn_user_message(warn_msg, user_name, channel_id):
     intro_warn_message = "The previous message sent by {} contains {}\n".format(user_name, warn_msg)
     intro_warn_message += "Please avoid opening the link(s) in this message"
     response_user_warn_msg = slack_web_adapter.send_msg(msg_to_send=intro_warn_message, channel_to_send=channel_id)
-    print("Warned user")
 
 
 def process_message_in_thread():
@@ -184,7 +173,7 @@ def process_message_in_thread():
 
         # Insert the event into database
         database_operator.insert_into_table(database_con, database_cursor, parsed_dict, result_dict, database_ordered_dict)
-        print(result_dict)
+        logging.debug(result_dict)
         alert_msg = ''
         delete_msg = ''
         warn_msg = ''
@@ -210,34 +199,58 @@ def process_message_in_thread():
             send_alert_message(alert_msg, parsed_dict['user_name'], parsed_dict['channel_name'],
                                parsed_dict['timestamp_string'], parsed_dict['text'])
 
-        print('@' * 100)
         payload_queue.task_done()
 
 
-# @slack_events_adapter.on(event="message")
 def process_message(payload):
     """Process the received message"""
     payload_queue.put(payload)
 
-# logger = logging.getLogger()
-# logger.setLevel(logging.DEBUG)
-# logger.addHandler(logging.StreamHandler())
+
+def clean_up_signal_handler(sig_num, stack_frame):
+    """Perform cleanup operations"""
+    try:
+        database_operator.close_database_connector_cursor(database_con, database_cursor)
+    except NameError as e:
+        logging.info("Database connector and cursor have not been initialized")
+    finally:
+        logging.info("Exit signal received")
+        logging.info("Exiting gracefully")
+        exit(0)
 
 
-flask_app = get_flask_app()
 # Read the JSON config file which contains slack bot token, slack admin token, slack signing secret, admin channel name
 config_dict = read_files.read_json_data('config_details.json')
 policy_dict, suspicious_dict = read_files.get_suspicious_items_dict('policy_details.json')
+
+# Initialize logging
+logging.basicConfig(filename=config_dict.get('LOG_FILE_PATH'), format='%(levelname)s:%(asctime)s:%(name)s:%(message)s', level=logging.DEBUG)
+
+# Get the flask application
+flask_app = get_flask_app()
+
 slack_events_adapter, slack_web_adapter = get_slack_adapters(config_dict, flask_app)
 process_message = slack_events_adapter.on(event='message', f=process_message)
 
 # Read the database config file
 database_ordered_dict = read_files.read_json_data('database_details.json', order=True)
-database_con, database_cursor = database_operator.get_database_connector_cursor(database_ordered_dict, initialize_table=False)
+database_con, database_cursor = database_operator.get_database_connector_cursor(database_ordered_dict, initialize_table=True)
 
+# Initialize a queue, and start a daemon thread to process elements in queue
 payload_queue = queue.Queue()
 thread_worker = threading.Thread(target=process_message_in_thread, daemon=True)
 thread_worker.start()
+
+# Handle signals
+try:
+    signal.signal(signal.SIGINT, clean_up_signal_handler)
+except AttributeError as e:
+    logging.error(e)
+try:
+    signal.signal(signal.SIGTERM, clean_up_signal_handler)
+except AttributeError as e:
+    logging.error(e)
+
 
 if __name__ == '__main__':
     flask_app.run(host='0.0.0.0', port=8000)
