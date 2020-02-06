@@ -49,7 +49,7 @@ def create_initial_table(database_con, database_cursor, table_name, table_fields
         return True
 
 
-def get_database_connector_cursor(database_ordered_dict, initialize_table=False):
+def get_database_connector_cursor(database_ordered_dict, initialize_table=True):
     """Get a database connector and cursor.
     If initialize_table is set to True, the table with 'table_name' key in the given dictionary is created if the that table did not exist already"""
     database_con, database_cursor = connect_to_database(database_ordered_dict)
@@ -93,7 +93,7 @@ def insert_from_dict_into_table(database_con, database_cursor, database_insert_d
         values_list.append(value)
 
     if values_string[-1] == ',':
-        values_stdring = values_string[:-1] + ')'
+        values_string = values_string[:-1] + ')'
 
     if sql_query[-1] == ',':
         sql_query = sql_query[:-1] + ')'
