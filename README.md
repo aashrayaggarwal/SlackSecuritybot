@@ -11,7 +11,7 @@ The instructions below will enable you to run the project.
 #### Configuring a Slack Application
 
 * Create a Slack application in your workspace: [Slack Applications](https://api.slack.com/apps)
-* Your slack applications can be found in [Slack Applications](https://api.slack.com/apps). Open this link to obtain necessary information about your applicaion.
+* After you create your application, you can find it listed here [Slack Applications](https://api.slack.com/apps). Open this link to obtain necessary information about your application.
 * Install the Slack application to your workspace
 * Create a private admin channel. SlackGuard will send alerts to this channel. Add Administrators to this channel.
 * Authorize the Slack application with proper permissions to allow SlackGuard to read/write messages to Slack Channel
@@ -79,7 +79,7 @@ You can create your own filters in the following manner
 * If your function requires reading a file for comparison, place that file in `known_databases` folder
 * Add the filter in the file `policy_details.json` in the format
   ``` 
-  "your_filter_name"`: {"to_Delete": false, "to_Warn": true, "database_path": "your_filter_function_reference_file", "detector_func": "your_filter_function_name"}
+  "your_filter_name": {"to_Delete": false, "to_Warn": true, "database_path": "your_filter_function_reference_file", "detector_func": "your_filter_function_name"}
   ```
 * If your filter function does not use a reference file, `"database_path"` should be `""`
 
