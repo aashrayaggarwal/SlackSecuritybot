@@ -1,8 +1,8 @@
 {
   "host": "localhost",
-  "database": "events_db",
+  "database": "your_database_name",
   "port": 5432,
-  "table_name": "message_events",
+  "table_name": "your_table_name",
   "table_fields": {
     "id": "BIGSERIAL",
     "message_type": "TEXT",
