@@ -17,9 +17,9 @@ def get_flask_app(flask_name = __name__):
     return flask_app_name
 
 
-def get_slack_event_adapter(SLACK_SIGNING_SECRET, flask_app):
+def get_slack_event_adapter(SLACK_SIGNING_SECRET, SLACK_ENDPOINT, flask_app):
     """Return event adapter of slack"""
-    slack_events_adapter = SlackEventAdapter(SLACK_SIGNING_SECRET, endpoint="/slack/events", server=flask_app)
+    slack_events_adapter = SlackEventAdapter(SLACK_SIGNING_SECRET, endpoint=SLACK_ENDPOINT, server=flask_app)
     return slack_events_adapter
 
 
@@ -31,7 +31,7 @@ def get_slack_web_adapter(SLACK_BOT_TOKEN, ADMIN_CHANNEL_NAME=''):
 
 def get_slack_adapters(config_dict, flask_app):
     """Return the web and event slack adapters"""
-    slack_events_adapter = get_slack_event_adapter(config_dict['SLACK_SIGNING_SECRET'], flask_app)
+    slack_events_adapter = get_slack_event_adapter(config_dict['SLACK_SIGNING_SECRET'], config_dict["SLACK_ENDPOINT"], flask_app)
     # Using slack admin token instead of slack bot token
     # Admin token allows for deletion of other's messages.
     slack_web_adapter = get_slack_web_adapter(config_dict['SLACK_ADMIN_TOKEN'], config_dict['ADMIN_CHANNEL_NAME'])
