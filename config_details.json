@@ -1,0 +1,8 @@
+{
+  "SLACK_ENDPOINT": "/slack/events",
+  "SLACK_ADMIN_TOKEN": "your_slack_user_token",
+  "SLACK_SIGNING_SECRET" : "your_slack_secret",
+  "ADMIN_CHANNEL_NAME" : "your_private_channel_name",
+  "LOG_FILE_PATH": "your_logfile_path"
+
+}
